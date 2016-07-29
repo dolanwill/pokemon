@@ -24,34 +24,45 @@ pokemon_dict = {"1":"Bulbasaur","2":"Ivysaur","3":"Venusaur","4":"Charmander","5
 fav_pokemon = ["1","2","3","4","5","6","7","8","9","12","15","23","24","25","26","31","34","37","39","49","58","63","64","65","67","77","78","93","94","95","104","106","107","111","113","115","123","125","126","128","130","131","133","137","138","140","142","143","147"]
 cannon_coords = {"lat":"42.40653753463761","lon":"-71.11905097961426"}
 CEEO_coords = {"lat":"42.4154547","lon":"-71.1266362"}
-epoch_time = int(time.time())
-reqheader = [
-  'User-Agent: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.2.12) Gecko/20101026 Firefox/3.6.12',
-  'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language: en-us,en;q=0.5',
-  'Accept-Encoding: gzip,deflate',
-  'Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7',
-  'Keep-Alive: 115',
-  'Connection: keep-alive',
-]
-r = requests.get('https://pokevision.com/map/data/'+CEEO_coords['lat']+'/'+CEEO_coords['lon'])
-rj = r.json()
+ellis_oval_coords = {"lat":"42.403210231279765","lon":"-71.1179780960083"}
 
-current_pokemon = rj['pokemon']
-pkcount = 0
+coords = CEEO_coords
 
-for pokemon in current_pokemon:
-    if str(pokemon['pokemonId']) in fav_pokemon:
-        print (pokemon_dict[str(pokemon['pokemonId'])]+' alive for ' + str((int(pokemon['expiration_time']) - epoch_time)) + ' seconds')
-        print str(haversine(float(pokemon['latitude']),float(pokemon['longitude']),float(CEEO_coords['lat']),float(CEEO_coords['lon']))) + " km away"
-        lat_dir = "north "
-        lon_dir = "west"
-        if float(pokemon['latitude']) < float(CEEO_coords['lat']):
-            lat_dir = "south "
-        if float(pokemon['longitude']) > float(CEEO_coords['lon']):
-            lon_dir = "east"
-        print "in the "+lat_dir+lon_dir+" direction\n"
-        pkcount += 1
+curr_pokemon = []
+while(True):
+    requests.get('https://pokevision.com/map/scan/'+coords['lat']+'/'+coords['lon'])
+    time.sleep(5)
+    r = requests.get('https://pokevision.com/map/data/'+coords['lat']+'/'+coords['lon'])
+    rj = r.json()
+    epoch_time = int(time.time())
 
-if pkcount < 1:
-    print "no interesting pokemon nearby"
+    new_pokemon = rj['pokemon']
+    new_pokemon_ids = []
+    for pokemon in new_pokemon:
+        if str(pokemon['pokemonId']) in fav_pokemon:
+            new_pokemon_ids.append(str(pokemon['pokemonId']))
+            if str(pokemon['pokemonId']) not in curr_pokemon:
+                curr_pokemon.append(str(pokemon['pokemonId']))
+
+                pkmn_name = pokemon_dict[str(pokemon['pokemonId'])].lower()
+                pkmn_duration = str((int(pokemon['expiration_time']) - epoch_time)/60)+'_minutes_'+str((int(pokemon['expiration_time']) - epoch_time)%60)+"_seconds"
+                pkmn_distance = str(haversine(float(pokemon['latitude']),float(pokemon['longitude']),float(coords['lat']),float(coords['lon'])))
+                pkmn_distance +="_km_"
+                if float(pokemon['latitude']) < float(coords['lat']):
+                    pkmn_distance += 'South'
+                else:
+                    pkmn_distance += 'North'
+                if float(pokemon['longitude']) < float(coords['lon']):
+                    pkmn_distance += 'West'
+                else:
+                    pkmn_distance += 'East'
+
+                print pkmn_name +' alive for ' + pkmn_duration
+                print pkmn_distance
+                r2 = requests.get('https://maker.ifttt.com/trigger/new_pokemon/with/key/cc4tiyJ1yeYS79kk8nP45V?value1='+pkmn_name+'&value2='+pkmn_distance+'&value3='+pkmn_duration)
+
+    for pokemon_id in curr_pokemon:
+        if pokemon_id not in new_pokemon_ids:
+            curr_pokemon.remove(pokemon_id)
+
+    time.sleep(30)
